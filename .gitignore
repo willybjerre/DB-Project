@@ -1,0 +1,20 @@
+## .NET build outputs
+bin/
+obj/
+out/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## Rider / Visual Studio / VS Code
+.vs/
+.idea/
+*.swp
+
+## OS files
+.DS_Store
+Thumbs.db
+
+## Logs
+*.log
