@@ -16,7 +16,29 @@ builder.Services.AddHttpClient<YrClient>(c =>
     c.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", "DIKUWeatherProject/0.1 willybjerre@gmail.com");
 });
 
+builder.Services.AddHttpClient<DmiClient>(c =>
+{
+    c.BaseAddress = new Uri("https://api.open-meteo.com/");
+});
+
+builder.Services.AddHttpClient<MeteostatClient>(c =>
+{
+    c.BaseAddress = new Uri("https://meteostat.p.rapidapi.com/");
+});
+
 builder.Services.AddScoped<ForecastIngestionService>();
+builder.Services.AddScoped<ObservationIngestionService>();
+builder.Services.AddScoped<ComparisonService>();
+
+builder.Services.AddHostedService<DailyIngestionService>();
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("frontend", policy => policy
+        .WithOrigins("http://localhost:5173")
+        .AllowAnyHeader()
+        .AllowAnyMethod());
+});
 
 builder.Services.AddControllers();
 
@@ -33,6 +55,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+app.UseCors("frontend");
+
 app.MapControllers();
 
 app.Run();

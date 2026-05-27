@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Forecast Accuracy</title>
+    <link rel="stylesheet" href="style.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="page">
+        <header class="hero awaiting-guess">
+            <img class="hero-img hero-img-default" src="pictures/hero.png" alt="Yr vs DMI — two storm giants facing off" />
+            <img class="hero-img hero-img-yr" src="pictures/hero_YR_Winner.png" alt="Yr wins" />
+            <img class="hero-img hero-img-dmi" src="pictures/hero_DMI_Winner.png" alt="DMI wins" />
+
+            <!-- Click-zoner over de to kæmpers hoveder. Procentbaseret position,
+                 så de skalerer korrekt når hero ændrer størrelse. -->
+            <button class="hero-zone hero-zone-yr" data-provider="Yr" type="button"
+                    aria-label="Guess Yr is most accurate">
+                <span class="zone-tag">Yr</span>
+            </button>
+            <button class="hero-zone hero-zone-dmi" data-provider="DMI" type="button"
+                    aria-label="Guess DMI is most accurate">
+                <span class="zone-tag">DMI</span>
+            </button>
+
+            <div class="hero-content">
+                <div class="hero-text">
+                    <span class="hero-hint">👆 Click Yr or DMI to guess</span>
+                    <h1>Forecast Accuracy</h1>
+                    <p class="subtitle">Copenhagen — Yr vs DMI vs observed temperature</p>
+                </div>
+                <div class="segmented" role="tablist" aria-label="Time window">
+                    <button id="btn-7" class="seg-btn" type="button" role="tab">7 days</button>
+                    <button id="btn-30" class="seg-btn" type="button" role="tab">30 days</button>
+                </div>
+            </div>
+        </header>
+
+        <section class="card" id="verdict-section">
+            <h2 class="section-title">
+                Verdict<span class="window-label" id="verdict-window"></span>
+            </h2>
+            <p class="section-subtitle">Mean absolute error against observed temperature.</p>
+            <div class="verdict-stage">
+                <div class="card-body" id="verdict-body">
+                    <div class="loading">Loading…</div>
+                </div>
+                <div class="verdict-gate" id="verdict-gate" aria-hidden="true">
+                    <div class="gate-prompt">
+                        <div class="gate-icon">🤔</div>
+                        <div class="gate-text">Guess who's more accurate — click a contender above</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="card" id="tomorrow-section">
+            <h2 class="section-title">Next 24 hours</h2>
+            <p class="section-subtitle">What Yr and DMI predict for tomorrow.</p>
+            <div class="card-body" id="tomorrow-body">
+                <div class="loading">Loading…</div>
+            </div>
+        </section>
+
+        <section class="card" id="history-section">
+            <h2 class="section-title">
+                History<span class="window-label" id="history-window"></span>
+            </h2>
+            <p class="section-subtitle">Forecasts vs what actually happened.</p>
+            <div class="card-body" id="history-body">
+                <div class="loading">Loading…</div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Fullscreen takeover efter gæt: vinder-billedet fylder skærmen i 2 sekunder
+         med en popup-besked ovenpå (right/wrong). Skjult som default. -->
+    <div class="fullscreen-reveal" id="fullscreen-reveal" aria-hidden="true">
+        <img class="reveal-img" id="reveal-img" alt="" />
+        <div class="reveal-popup" id="reveal-popup"></div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

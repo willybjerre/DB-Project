@@ -8,15 +8,18 @@ public class ForecastIngestionService
 {
     private readonly WeatherDbContext _db;
     private readonly YrClient _yr;
+    private readonly DmiClient _dmi;
     private readonly ILogger<ForecastIngestionService> _log;
 
     public ForecastIngestionService(
         WeatherDbContext db,
         YrClient yr,
+        DmiClient dmi,
         ILogger<ForecastIngestionService> log)
     {
         _db = db;
         _yr = yr;
+        _dmi = dmi;
         _log = log;
     }
 
@@ -25,16 +28,35 @@ public class ForecastIngestionService
         var location = await _db.Locations.FindAsync([locationId], ct)
             ?? throw new InvalidOperationException($"Location {locationId} not found.");
 
-        var yrApp = await _db.Applications.FirstOrDefaultAsync(a => a.Name == "Yr", ct)
-            ?? throw new InvalidOperationException("Application 'Yr' is not seeded.");
-
         var points = await _yr.GetForecastAsync(location.Latitude, location.Longitude, ct);
+
+        return await UpsertForecastsAsync("Yr", locationId, points, ct);
+    }
+
+    public async Task<int> IngestDmiForecastAsync(int locationId, CancellationToken ct = default)
+    {
+        var location = await _db.Locations.FindAsync([locationId], ct)
+            ?? throw new InvalidOperationException($"Location {locationId} not found.");
+
+        var points = await _dmi.GetForecastAsync(location.Latitude, location.Longitude, ct);
+
+        return await UpsertForecastsAsync("DMI", locationId, points, ct);
+    }
+
+    private async Task<int> UpsertForecastsAsync(
+        string providerName,
+        int locationId,
+        IReadOnlyList<ForecastPoint> points,
+        CancellationToken ct)
+    {
+        var app = await _db.Applications.FirstOrDefaultAsync(a => a.Name == providerName, ct)
+            ?? throw new InvalidOperationException($"Application '{providerName}' is not seeded.");
 
         if (points.Count < 12)
         {
             _log.LogWarning(
-                "Yr returned only {Count} forecasts for location {LocationId} (sanity threshold is 12)",
-                points.Count, locationId);
+                "{Provider} returned only {Count} forecasts for location {LocationId} (sanity threshold is 12)",
+                providerName, points.Count, locationId);
         }
 
         if (points.Count == 0)
@@ -47,7 +69,7 @@ public class ForecastIngestionService
         var maxTime = points.Max(p => p.TargetUtc);
 
         var existing = await _db.Forecasts
-            .Where(f => f.AppId == yrApp.AppId
+            .Where(f => f.AppId == app.AppId
                         && f.LocationId == locationId
                         && f.TargetDateTime >= minTime
                         && f.TargetDateTime <= maxTime)
@@ -67,7 +89,7 @@ public class ForecastIngestionService
             {
                 _db.Forecasts.Add(new Forecast
                 {
-                    AppId = yrApp.AppId,
+                    AppId = app.AppId,
                     LocationId = locationId,
                     TargetDateTime = p.TargetUtc,
                     PredTemp = p.TempC,
@@ -80,8 +102,8 @@ public class ForecastIngestionService
         await _db.SaveChangesAsync(ct);
 
         _log.LogInformation(
-            "Ingested {Count} Yr forecasts for location {LocationId}",
-            processed, locationId);
+            "Ingested {Count} {Provider} forecasts for location {LocationId}",
+            processed, providerName, locationId);
 
         return processed;
     }

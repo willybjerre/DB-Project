@@ -1,0 +1,689 @@
+:root {
+    --bg: #0e1116;
+    --bg-2: #12151c;
+    --card: #1a1f29;
+    --card-2: #20262f;
+    --border: #262c38;
+    --border-strong: #303744;
+    --text: #e8eaed;
+    --muted: #8b909c;
+    --yr: #f5a623;
+    --dmi: #3b9eff;
+    --obs: #3ecf8e;
+    --error: #ff6b6b;
+    --radius: 14px;
+    --radius-sm: 10px;
+    --shadow: 0 8px 24px rgba(255, 0, 0, 0.35);
+    --transition: 180ms ease;
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; padding: 0; }
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background-color: var(--bg);
+    /* Faint blue glow under the hero + a gentle vertical fade — så bg ikke er en flad slab. */
+    background-image:
+        radial-gradient(ellipse at 50% -10%, rgba(59, 158, 255, 0.10) 0%, transparent 55%),
+        linear-gradient(180deg, var(--bg-2) 0%, var(--bg) 720px);
+    background-attachment: fixed;
+    color: var(--text);
+    line-height: 1.5;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+}
+
+.page {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 2rem 1.25rem 4rem;
+}
+
+/* ================= HERO ================= */
+
+.hero {
+    position: relative;
+    height: 440px;
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-bottom: 2rem;
+    background: #14181f;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+}
+
+.hero-img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center top;
+    display: block;
+    opacity: 0;
+    transition: opacity 500ms ease;
+}
+
+/* Standard: default-billedet er synligt. Når .hero får .yr-won eller .dmi-won
+   (efter et gæt), fader vi over til det rette winner-billede. */
+.hero-img-default { opacity: 1; }
+.hero.yr-won  .hero-img-default { opacity: 0; }
+.hero.yr-won  .hero-img-yr      { opacity: 1; }
+.hero.dmi-won .hero-img-default { opacity: 0; }
+.hero.dmi-won .hero-img-dmi     { opacity: 1; }
+
+/* Winner-billedet popper ind: zoomer kort ud fra ~1.12× ned til 1× — dramatisk
+   nok til at fange brugerens øjne uden at skulle scrolle. */
+.hero.yr-won  .hero-img-yr,
+.hero.dmi-won .hero-img-dmi {
+    animation: winner-pop 760ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes winner-pop {
+    0%   { opacity: 0; transform: scale(1.12); }
+    55%  { opacity: 1; transform: scale(1.03); }
+    100% { opacity: 1; transform: scale(1); }
+}
+
+/* Gradient overlay: only fades in near the bottom so the title stays readable —
+   the picture itself is left untouched. */
+.hero::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+        linear-gradient(180deg,
+            rgba(14, 17, 22, 0) 0%,
+            rgba(14, 17, 22, 0) 60%,
+            rgba(14, 17, 22, 0.85) 100%);
+    pointer-events: none;
+}
+
+.hero-content {
+    position: relative;
+    z-index: 1;
+    height: 100%;
+    padding: 1.5rem 2rem;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1.5rem;
+}
+
+.hero h1 {
+    margin: 0 0 0.3rem;
+    font-size: 2.1rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    text-shadow: 0 2px 16px rgba(0, 0, 0, 0.5);
+}
+
+.hero .subtitle {
+    margin: 0;
+    color: rgba(232, 234, 237, 0.78);
+    font-size: 0.98rem;
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.4);
+}
+
+/* ================= HERO CLICK ZONES ================= */
+
+/* Usynlige knapper over kæmpernes hoveder. Procent-positioner så de følger
+   hero'ens størrelse. De pulserer mens .awaiting-guess er sat — det er
+   det visuelle signal "klik mig". */
+.hero-zone {
+    position: absolute;
+    z-index: 3;
+    background: transparent;
+    border: 2px solid transparent;
+    border-radius: 999px;
+    padding: 0;
+    cursor: pointer;
+    font-family: inherit;
+    transition: transform 200ms ease,
+                box-shadow 200ms ease,
+                border-color 200ms ease;
+}
+
+.hero-zone-yr {
+    top: 16%;
+    left: 22%;
+    width: 14%;
+    height: 28%;
+}
+
+.hero-zone-dmi {
+    top: 16%;
+    right: 14%;
+    width: 14%;
+    height: 28%;
+}
+
+/* Efter første gæt forsvinder zonerne for resten af side-loadet — ét gæt per refresh. */
+.hero.guessed .hero-zone { display: none; }
+
+.zone-tag {
+    position: absolute;
+    bottom: -2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(20, 24, 32, 0.92);
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text);
+    opacity: 0;
+    transition: opacity 180ms ease, color 180ms ease, border-color 180ms ease;
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+.hero-zone:hover {
+    transform: scale(1.04);
+    animation: none;
+}
+
+.hero-zone:hover .zone-tag {
+    opacity: 1;
+}
+
+.hero-zone-yr:hover {
+    border-color: rgba(245, 166, 35, 0.9);
+    box-shadow:
+        0 0 24px rgba(245, 166, 35, 0.45),
+        0 0 0 4px rgba(245, 166, 35, 0.2);
+}
+.hero-zone-yr:hover .zone-tag {
+    color: var(--yr);
+    border-color: var(--yr);
+}
+
+.hero-zone-dmi:hover {
+    border-color: rgba(59, 158, 255, 0.9);
+    box-shadow:
+        0 0 24px rgba(59, 158, 255, 0.45),
+        0 0 0 4px rgba(59, 158, 255, 0.2);
+}
+.hero-zone-dmi:hover .zone-tag {
+    color: var(--dmi);
+    border-color: var(--dmi);
+}
+
+/* Pulsering mens vi venter på et gæt — drager opmærksomhed til zonerne. */
+.hero.awaiting-guess .hero-zone-yr {
+    animation: pulse-yr 2.4s ease-in-out infinite;
+}
+.hero.awaiting-guess .hero-zone-dmi {
+    animation: pulse-dmi 2.4s ease-in-out infinite;
+}
+
+@keyframes pulse-yr {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(245, 166, 35, 0);
+        border-color: rgba(245, 166, 35, 0.22);
+    }
+    50% {
+        box-shadow: 0 0 18px 1px rgba(245, 166, 35, 0.28);
+        border-color: rgba(245, 166, 35, 0.6);
+    }
+}
+
+@keyframes pulse-dmi {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(59, 158, 255, 0);
+        border-color: rgba(59, 158, 255, 0.22);
+    }
+    50% {
+        box-shadow: 0 0 18px 1px rgba(59, 158, 255, 0.28);
+        border-color: rgba(59, 158, 255, 0.6);
+    }
+}
+
+/* Hint-pille over titlen — fader ud når brugeren har gættet. */
+.hero-hint {
+    display: inline-block;
+    background: rgba(20, 24, 32, 0.78);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    padding: 0.32rem 0.85rem;
+    font-size: 0.78rem;
+    color: var(--text);
+    margin-bottom: 0.7rem;
+    white-space: nowrap;
+    transition: opacity 280ms ease, transform 280ms ease;
+}
+
+.hero:not(.awaiting-guess) .hero-hint {
+    opacity: 0;
+    transform: translateY(4px);
+}
+
+/* ================= SEGMENTED TOGGLE ================= */
+
+.segmented {
+    display: inline-flex;
+    background: rgba(20, 24, 32, 0.72);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    padding: 4px;
+    gap: 2px;
+}
+
+.seg-btn {
+    background: transparent;
+    border: 0;
+    color: var(--muted);
+    padding: 0.5rem 1.05rem;
+    border-radius: 999px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background var(--transition), color var(--transition);
+}
+
+.seg-btn:hover { color: var(--text); }
+
+.seg-btn.active {
+    background: var(--dmi);
+    color: #0a0d12;
+    font-weight: 600;
+}
+
+/* ================= CARDS ================= */
+
+.card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem 1.75rem;
+    margin-bottom: 1.5rem;
+    box-shadow: var(--shadow);
+}
+
+.section-title {
+    margin: 0 0 0.25rem;
+    font-size: 1.25rem;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+}
+
+.section-title .window-label {
+    color: var(--muted);
+    font-weight: 400;
+    font-size: 0.92rem;
+    margin-left: 0.5rem;
+}
+
+.section-subtitle {
+    margin: 0 0 1.25rem;
+    color: var(--muted);
+    font-size: 0.92rem;
+}
+
+/* ================= STATES ================= */
+
+.loading {
+    color: var(--muted);
+    text-align: center;
+    padding: 2.5rem 1rem;
+    animation: pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 0.5; }
+    50%      { opacity: 1; }
+}
+
+.section-error {
+    color: var(--error);
+    background: rgba(255, 107, 107, 0.07);
+    border: 1px solid rgba(255, 107, 107, 0.25);
+    border-radius: var(--radius-sm);
+    padding: 1rem 1.25rem;
+    text-align: center;
+    font-size: 0.95rem;
+}
+
+.empty-state {
+    color: var(--muted);
+    text-align: center;
+    padding: 2rem 1rem;
+    font-size: 0.95rem;
+}
+
+/* ================= FULLSCREEN TAKEOVER (efter gæt) ================= */
+
+.fullscreen-reveal {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 380ms ease;
+}
+
+.fullscreen-reveal.visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.reveal-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+/* Animationerne kører kun når overlayet faktisk vises — selectoren binder
+   sig til .visible, så de affyres ved hvert reveal og ikke ved page load. */
+.fullscreen-reveal.visible .reveal-img {
+    animation: takeover-pop 700ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes takeover-pop {
+    0%   { transform: scale(1.15); }
+    100% { transform: scale(1); }
+}
+
+.reveal-popup {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(20, 24, 32, 0.92);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid var(--border-strong);
+    border-radius: 20px;
+    padding: 1.75rem 2.75rem;
+    color: var(--text);
+    text-align: center;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.7);
+    max-width: 85vw;
+    line-height: 1.25;
+}
+
+.fullscreen-reveal.visible .reveal-popup {
+    animation: popup-in 540ms cubic-bezier(0.16, 1, 0.3, 1) 180ms backwards;
+}
+
+.reveal-popup.correct {
+    border-color: rgba(62, 207, 142, 0.6);
+    color: var(--obs);
+    box-shadow:
+        0 30px 80px rgba(0, 0, 0, 0.7),
+        0 0 60px rgba(62, 207, 142, 0.3);
+}
+
+.reveal-popup.wrong {
+    border-color: rgba(255, 107, 107, 0.6);
+    color: var(--error);
+    box-shadow:
+        0 30px 80px rgba(0, 0, 0, 0.7),
+        0 0 60px rgba(255, 107, 107, 0.3);
+}
+
+.reveal-headline {
+    font-size: 2.3rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin-bottom: 0.35rem;
+}
+
+.reveal-sub {
+    font-size: 1.15rem;
+    font-weight: 500;
+    opacity: 0.88;
+    color: var(--text);
+}
+
+@keyframes popup-in {
+    0%   { transform: translate(-50%, -50%) scale(0.55); opacity: 0; }
+    65%  { transform: translate(-50%, -50%) scale(1.08); opacity: 1; }
+    100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+
+/* ================= VERDICT — GATE / REVEAL ================= */
+
+.verdict-stage {
+    position: relative;
+}
+
+.verdict-stage .card-body {
+    transition: filter 420ms ease, opacity 420ms ease;
+}
+
+/* Skjult tilstand: card-body blurres ud, gate ligger ovenpå med prompt. */
+#verdict-section:not(.revealed) .verdict-stage .card-body {
+    filter: blur(10px);
+    opacity: 0.35;
+    pointer-events: none;
+    user-select: none;
+}
+
+.verdict-gate {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 420ms ease, transform 420ms ease;
+}
+
+#verdict-section.revealed .verdict-gate {
+    opacity: 0;
+    transform: translateY(-8px);
+}
+
+.gate-prompt {
+    background: rgba(20, 24, 32, 0.78);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    padding: 1.1rem 1.5rem;
+    color: var(--text);
+    text-align: center;
+    max-width: 90%;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.gate-icon {
+    font-size: 1.7rem;
+    margin-bottom: 0.35rem;
+}
+
+.gate-text {
+    font-size: 0.98rem;
+    font-weight: 500;
+}
+
+/* Result-besked vises øverst i verdict-body efter et gæt. */
+.guess-result {
+    font-size: 1.02rem;
+    font-weight: 500;
+    padding: 0.85rem 1.1rem;
+    border-radius: var(--radius-sm);
+    margin-bottom: 1.25rem;
+}
+
+.guess-result.correct {
+    background: rgba(62, 207, 142, 0.10);
+    border: 1px solid rgba(62, 207, 142, 0.35);
+    color: var(--obs);
+}
+
+.guess-result.wrong {
+    background: rgba(255, 107, 107, 0.09);
+    border: 1px solid rgba(255, 107, 107, 0.32);
+    color: var(--error);
+}
+
+/* ================= VERDICT ================= */
+
+.verdict-line {
+    font-size: 1.35rem;
+    font-weight: 500;
+    margin: 0 0 1.25rem;
+    color: var(--text);
+}
+
+.winner-name {
+    font-weight: 700;
+}
+.winner-name.yr  { color: var(--yr); }
+.winner-name.dmi { color: var(--dmi); }
+
+.metric-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+}
+
+.metric-card {
+    position: relative;
+    background: var(--card-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 1.25rem 1.25rem 1.1rem;
+    transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.metric-card.winner.yr {
+    border-color: rgba(245, 166, 35, 0.55);
+    box-shadow:
+        0 0 0 1px rgba(245, 166, 35, 0.18),
+        0 8px 28px rgba(245, 166, 35, 0.08);
+}
+
+.metric-card.winner.dmi {
+    border-color: rgba(59, 158, 255, 0.55);
+    box-shadow:
+        0 0 0 1px rgba(59, 158, 255, 0.18),
+        0 8px 28px rgba(59, 158, 255, 0.08);
+}
+
+.winner-badge {
+    position: absolute;
+    top: 0.85rem;
+    right: 0.85rem;
+    background: rgba(59, 158, 255, 0.15);
+    color: var(--dmi);
+    border: 1px solid rgba(59, 158, 255, 0.4);
+    border-radius: 999px;
+    padding: 0.22rem 0.6rem;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.metric-card.yr .winner-badge {
+    background: rgba(245, 166, 35, 0.15);
+    color: var(--yr);
+    border-color: rgba(245, 166, 35, 0.4);
+}
+
+.metric-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.65rem;
+}
+
+.dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    display: inline-block;
+}
+.dot-yr  { background: var(--yr); box-shadow: 0 0 8px rgba(245, 166, 35, 0.6); }
+.dot-dmi { background: var(--dmi); box-shadow: 0 0 8px rgba(59, 158, 255, 0.6); }
+
+.provider-name {
+    font-weight: 600;
+    font-size: 0.95rem;
+    letter-spacing: 0.02em;
+}
+.provider-name.yr  { color: var(--yr); }
+.provider-name.dmi { color: var(--dmi); }
+
+.metric-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    margin-bottom: 0.3rem;
+}
+.metric-value .unit {
+    font-size: 1.05rem;
+    font-weight: 500;
+    color: var(--muted);
+    margin-left: 0.3rem;
+}
+
+.metric-label {
+    color: var(--text);
+    font-size: 0.85rem;
+    opacity: 0.85;
+    margin-bottom: 0.35rem;
+}
+.metric-sub {
+    color: var(--muted);
+    font-size: 0.8rem;
+}
+
+.lower-better {
+    margin: 1.25rem 0 0;
+    color: var(--muted);
+    font-size: 0.78rem;
+    text-align: right;
+}
+
+/* ================= CHARTS ================= */
+
+.chart-wrap {
+    position: relative;
+    height: 360px;
+}
+
+.chart-note {
+    margin: 0.85rem 0 0;
+    color: var(--muted);
+    font-size: 0.85rem;
+    text-align: center;
+}
+
+/* ================= RESPONSIVE ================= */
+
+@media (max-width: 760px) {
+    .page { padding: 1.25rem 0.85rem 3rem; }
+    .hero { height: 300px; }
+    .hero h1 { font-size: 1.55rem; }
+    .hero-content {
+        flex-direction: column;
+        align-items: flex-start;
+        padding: 1.25rem;
+        gap: 1rem;
+    }
+    .card { padding: 1.25rem; }
+    .metric-grid { grid-template-columns: 1fr; }
+    .metric-value { font-size: 2.05rem; }
+    .chart-wrap { height: 300px; }
+}

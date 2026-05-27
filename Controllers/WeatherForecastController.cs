@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using MyWeatherApp.Data;
 using MyWeatherApp.Services;
 
 namespace MyWeatherApp.Controllers;
@@ -7,13 +9,26 @@ namespace MyWeatherApp.Controllers;
 [Route("api/[controller]")]
 public class WeatherForecastController : ControllerBase
 {
+    private const int DefaultLocationId = 1;
+
     private readonly YrClient _yr;
     private readonly ForecastIngestionService _ingestion;
+    private readonly ObservationIngestionService _observationIngestion;
+    private readonly ComparisonService _comparison;
+    private readonly WeatherDbContext _db;
 
-    public WeatherForecastController(YrClient yr, ForecastIngestionService ingestion)
+    public WeatherForecastController(
+        YrClient yr,
+        ForecastIngestionService ingestion,
+        ObservationIngestionService observationIngestion,
+        ComparisonService comparison,
+        WeatherDbContext db)
     {
         _yr = yr;
         _ingestion = ingestion;
+        _observationIngestion = observationIngestion;
+        _comparison = comparison;
+        _db = db;
     }
 
     // Læse-only debug — kalder Yr uden at skrive til DB. Nyttig til at isolere
@@ -32,7 +47,7 @@ public class WeatherForecastController : ControllerBase
     {
         try
         {
-            var saved = await _ingestion.IngestYrForecastAsync(locationId: 1, ct);
+            var saved = await _ingestion.IngestYrForecastAsync(DefaultLocationId, ct);
             return Ok(new { saved });
         }
         catch (Exception ex)
@@ -41,47 +56,91 @@ public class WeatherForecastController : ControllerBase
         }
     }
 
-    // GET api/weatherforecast/forecast/30days
-    [HttpGet("forecast/30DaysPercent")]
-    public IActionResult Get30DaysPercent_Forcast_vs_Obs()
+    // POST api/weatherforecast/ingest/dmi
+    [HttpPost("ingest/dmi")]
+    public async Task<IActionResult> IngestDmi(CancellationToken ct)
     {
-        // TODO: hent fra database — alle forecasts fra de sidste 30 dage compare med observation.
-        var data = Enumerable.Range(0, 30).Select(i => new
+        try
         {
-            Date = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-i)),
-            Provider = i % 2 == 0 ? "Yr" : "DMI",
-            PredictedTempC = Random.Shared.Next(-5, 25)
-        });
+            var saved = await _ingestion.IngestDmiForecastAsync(DefaultLocationId, ct);
+            return Ok(new { saved });
+        }
+        catch (Exception ex)
+        {
+            return Problem(detail: ex.Message, statusCode: 500, title: "DMI ingestion failed");
+        }
+    }
+
+    // POST api/weatherforecast/ingest/observations
+    [HttpPost("ingest/observations")]
+    public async Task<IActionResult> IngestObservations(CancellationToken ct)
+    {
+        try
+        {
+            var saved = await _observationIngestion.IngestObservationsAsync(DefaultLocationId, ct);
+            return Ok(new { saved });
+        }
+        catch (Exception ex)
+        {
+            return Problem(detail: ex.Message, statusCode: 500, title: "Observation ingestion failed");
+        }
+    }
+
+    // GET api/weatherforecast/comparison?days=30
+    [HttpGet("comparison")]
+    public async Task<IActionResult> GetComparison([FromQuery] int days = 30, CancellationToken ct = default)
+    {
+        var result = await _comparison.GetComparisonAsync(DefaultLocationId, days, ct);
+        return Ok(result);
+    }
+
+    // GET api/weatherforecast/timeseries?days=7
+    [HttpGet("timeseries")]
+    public async Task<IActionResult> GetTimeseries([FromQuery] int days = 7, CancellationToken ct = default)
+    {
+        var result = await _comparison.GetTimeseriesAsync(DefaultLocationId, days, ct);
+        return Ok(result);
+    }
+
+    // GET api/weatherforecast/tomorrow
+    [HttpGet("tomorrow")]
+    public async Task<IActionResult> GetTomorrow(CancellationToken ct = default)
+    {
+        // I morgen i UTC: [midnight tomorrow, midnight day-after).
+        var tomorrowStart = DateTime.UtcNow.Date.AddDays(1);
+        var tomorrowEnd = tomorrowStart.AddDays(1);
+
+        var data = await _db.Forecasts
+            .Where(f => f.LocationId == DefaultLocationId
+                        && f.TargetDateTime >= tomorrowStart
+                        && f.TargetDateTime < tomorrowEnd)
+            .OrderBy(f => f.TargetDateTime)
+            .ThenBy(f => f.Application.Name)
+            .Select(f => new
+            {
+                f.TargetDateTime,
+                Provider = f.Application.Name,
+                f.PredTemp
+            })
+            .ToListAsync(ct);
 
         return Ok(data);
     }
 
-    // GET api/weatherforecast/forecast/tomorrow
-    [HttpGet("forecast/tomorrow")]
-    public IActionResult GetTomorrowForecast()
+    // GET api/weatherforecast/observations?days=30
+    [HttpGet("observations")]
+    public async Task<IActionResult> GetObservations([FromQuery] int days = 30, CancellationToken ct = default)
     {
-        // TODO: hent dagens prognoser for i morgen kl. 10 UTC fra DB
-        var tomorrowAt10 = DateTime.UtcNow.Date.AddDays(1).AddHours(10);
+        var now = DateTime.UtcNow;
+        var windowStart = now.AddDays(-days);
 
-        var data = new[]
-        {
-            new { Provider = "Yr",  TargetTime = tomorrowAt10, PredictedTempC = 12.5 },
-            new { Provider = "DMI", TargetTime = tomorrowAt10, PredictedTempC = 11.8 }
-        };
-
-        return Ok(data);
-    }
-
-    // GET api/weatherforecast/observations/30days
-    [HttpGet("observations/30days")]
-    public IActionResult Get30DaysObservations()
-    {
-        // TODO: hent observationer fra Meteostat-tabellen i DB
-        var data = Enumerable.Range(0, 30).Select(i => new
-        {
-            Date = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-i)),
-            ActualTempC = Random.Shared.Next(-5, 25)
-        });
+        var data = await _db.Observations
+            .Where(o => o.LocationId == DefaultLocationId
+                        && o.ObsAt >= windowStart
+                        && o.ObsAt <= now)
+            .OrderBy(o => o.ObsAt)
+            .Select(o => new { o.ObsAt, o.Temp })
+            .ToListAsync(ct);
 
         return Ok(data);
     }
