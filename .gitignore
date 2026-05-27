@@ -18,3 +18,8 @@ Thumbs.db
 
 ## Logs
 *.log
+
+## Local / environment-specific config overrides — never commit these.
+appsettings.*.Local.json
+appsettings.Local.json
+appsettings.Production.json

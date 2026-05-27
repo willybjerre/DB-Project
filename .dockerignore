@@ -1,0 +1,31 @@
+# Build output
+**/bin/
+**/obj/
+**/out/
+
+# IDE / OS
+**/.vs/
+**/.vscode/
+**/.idea/
+**/*.user
+**/*.suo
+**/.DS_Store
+
+# Git / Docker
+.git/
+.gitignore
+.gitattributes
+.dockerignore
+Dockerfile
+
+# Stuff that doesn't belong in the API image
+frontend/
+db/
+.claude/
+
+# Local-only / docs
+Docker-Compose.yml
+MyWeatherApp.http
+README.md
+API.md
+STATUS.md
