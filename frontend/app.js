@@ -1,5 +1,8 @@
-// Backend base URL — skift den her når vi deployer.
-const API_BASE = 'http://localhost:5070';
+// Backend base URL. Lokal dev → lokal backend; ellers → Railway-deployment.
+// Vælges ud fra hostname så der ikke skal skiftes manuelt mellem miljøer.
+const API_BASE = location.hostname === "localhost" || location.hostname === "127.0.0.1"
+    ? "http://localhost:5070"
+    : "https://db-project-production-0e3d.up.railway.app";
 
 // Accent-farver — spejlet i style.css for verdict-kortene.
 const COLORS = {
