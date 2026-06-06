@@ -18,11 +18,14 @@ dotnet ef database update
 dotnet run
 ```
 
-## Live system
+## Live Production system
 
 - **Backend:** https://db-project-production-0e3d.up.railway.app
 - **Frontend:** https://willybjerre.github.io/WeatherAPP_Frontend/
-- **repo:** https://github.com/willybjerre/WeatherAPP_Frontend && https://github.com/willybjerre/DB-Project/
+
+  #repo
+- **Frontend:** https://github.com/willybjerre/WeatherAPP_Frontend
+- **Backend:** https://github.com/willybjerre/DB-Project/
 
 
 ## Run locally
