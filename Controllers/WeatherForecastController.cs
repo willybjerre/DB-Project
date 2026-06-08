@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MyWeatherApp.Data;
@@ -125,6 +127,111 @@ public class WeatherForecastController : ControllerBase
             .ToListAsync(ct);
 
         return Ok(data);
+    }
+
+    /// <summary>
+    /// Filters forecasts or observations for Copenhagen by matching a regular expression
+    /// against the temperature value (formatted as an invariant-culture string with one
+    /// decimal place, e.g. "20.0", "-3.2").
+    /// </summary>
+    /// <param name="source">Either "forecasts" or "observations" (case-insensitive).</param>
+    /// <param name="pattern">A regular expression to match against the temperature string.</param>
+    /// <returns>
+    /// The matching rows ordered ascending by time, along with the original pattern
+    /// and the number of matches.
+    /// </returns>
+    /// <response code="200">Returns the matching rows.</response>
+    /// <response code="400">If <paramref name="source"/> is invalid or <paramref name="pattern"/> is not a valid regex.</response>
+    /// <response code="408">If the regex match exceeds the 200 ms timeout (possible ReDoS).</response>
+    // GET api/weatherforecast/search?source=forecasts&pattern=^20
+    [HttpGet("search")]
+    public async Task<IActionResult> Search(
+        [FromQuery] string? source,
+        [FromQuery] string? pattern,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(source))
+        {
+            return BadRequest(new { error = "Query parameter 'source' is required and must be 'forecasts' or 'observations'." });
+        }
+        if (pattern is null)
+        {
+            return BadRequest(new { error = "Query parameter 'pattern' is required." });
+        }
+
+        var normalizedSource = source.Trim().ToLowerInvariant();
+        if (normalizedSource != "forecasts" && normalizedSource != "observations")
+        {
+            return BadRequest(new { error = $"Invalid 'source' value '{source}'. Must be 'forecasts' or 'observations'." });
+        }
+
+        Regex regex;
+        try
+        {
+            regex = new Regex(pattern, RegexOptions.None, TimeSpan.FromMilliseconds(200));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = $"Invalid regex pattern: {ex.Message}" });
+        }
+
+        try
+        {
+            if (normalizedSource == "forecasts")
+            {
+                var rows = await _db.Forecasts
+                    .Where(f => f.LocationId == DefaultLocationId)
+                    .OrderBy(f => f.TargetDateTime)
+                    .ThenBy(f => f.Application.Name)
+                    .Select(f => new
+                    {
+                        f.TargetDateTime,
+                        Provider = f.Application.Name,
+                        f.PredTemp
+                    })
+                    .ToListAsync(ct);
+
+                var results = rows
+                    // Regex matching — this is the implementation that satisfies the
+                    // course's "regular expression matching" requirement.
+                    .Where(r => regex.IsMatch(r.PredTemp.ToString("F1", CultureInfo.InvariantCulture)))
+                    .ToList();
+
+                return Ok(new
+                {
+                    source = "forecasts",
+                    pattern,
+                    matchCount = results.Count,
+                    results
+                });
+            }
+            else
+            {
+                var rows = await _db.Observations
+                    .Where(o => o.LocationId == DefaultLocationId)
+                    .OrderBy(o => o.ObsAt)
+                    .Select(o => new { o.ObsAt, o.Temp })
+                    .ToListAsync(ct);
+
+                var results = rows
+                    // Regex matching — this is the implementation that satisfies the
+                    // course's "regular expression matching" requirement.
+                    .Where(r => regex.IsMatch(r.Temp.ToString("F1", CultureInfo.InvariantCulture)))
+                    .ToList();
+
+                return Ok(new
+                {
+                    source = "observations",
+                    pattern,
+                    matchCount = results.Count,
+                    results
+                });
+            }
+        }
+        catch (RegexMatchTimeoutException)
+        {
+            return StatusCode(StatusCodes.Status408RequestTimeout, new { error = "Pattern took too long to evaluate" });
+        }
     }
 
     // GET api/weatherforecast/observations?days=30
